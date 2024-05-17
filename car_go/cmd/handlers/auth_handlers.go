@@ -1,20 +1,17 @@
 package handlers
 
 import (
-    "fmt"
-	"encoding/json"
-	"net/http"
-	"strconv"
-    "strings"
-    "context"
-    "time"
-
-    "golang.org/x/crypto/bcrypt"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/gorilla/mux"
-
-	"car_project/pkg/model"
 	"car_project/pkg/db"
+	"car_project/pkg/model"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/dgrijalva/jwt-go"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func Authenticate(next http.Handler) http.Handler {
@@ -45,7 +42,12 @@ func Authenticate(next http.Handler) http.Handler {
 
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 			// Inject user ID into the context for downstream handlers to use
-			ctx := context.WithValue(r.Context(), "userID", claims["userID"])
+			type contextKey string
+
+			const (
+			    userIDKey contextKey = "userID"
+			)
+			ctx := context.WithValue(r.Context(), userIDKey, claims["userID"])
 			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
 		} else {
@@ -112,70 +114,54 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
     w.Write([]byte(tokenString))
 }
 
-func CreateCar(w http.ResponseWriter, r *http.Request) {
-    var c model.Car
-    _ = json.NewDecoder(r.Body).Decode(&c)
-    err := db.CreateCar(c)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
+func Activate(w http.ResponseWriter, r *http.Request) {
+    // Extract the expired token from the request header or request body
+    expiredToken := r.Header.Get("Expired-Token")
+    if expiredToken == "" {
+        http.Error(w, "Expired token not provided", http.StatusBadRequest)
         return
     }
-    w.WriteHeader(http.StatusCreated)
-}
 
-func GetAllCars(w http.ResponseWriter, r *http.Request) {
-    query := r.URL.Query()
-    page, _ := strconv.Atoi(query.Get("page"))
-    limit, _ := strconv.Atoi(query.Get("limit"))
-    sortBy := query.Get("sortBy")
-    filterBy := query.Get("filterBy")
-
-    if page == 0 {
-        page = 1
-    }
-    if limit == 0 {
-        limit = 10
-    }
-
-    cars, err := db.GetCarWithPagination(page, limit, sortBy, filterBy)
+    // Parse the expired token
+    token, err := jwt.Parse(expiredToken, func(token *jwt.Token) (interface{}, error) {
+        // Check the signing method
+        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+            return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+        }
+        return []byte("YourSecretKey"), nil  // Use your actual secret key
+    })
     if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
+        http.Error(w, "Invalid token", http.StatusUnauthorized)
         return
     }
-    json.NewEncoder(w).Encode(cars)
-}
 
-func GetCar(w http.ResponseWriter, r *http.Request) {
-    params := mux.Vars(r)
-    id, _ := strconv.Atoi(params["id"])
-    car, err := db.GetCarByID(id)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
+    // Extract claims from the expired token
+    claims, ok := token.Claims.(jwt.MapClaims)
+    if !ok || !token.Valid {
+        http.Error(w, "Invalid token", http.StatusUnauthorized)
         return
     }
-    json.NewEncoder(w).Encode(car)
-}
 
-func UpdateCar(w http.ResponseWriter, r *http.Request) {
-    params := mux.Vars(r)
-    id, _ := strconv.Atoi(params["id"])
-    var c model.Car
-    _ = json.NewDecoder(r.Body).Decode(&c)
-    err := db.UpdateCarByID(id, c)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
+    // Extract user ID from claims
+    userID, ok := claims["userID"].(int)
+    if !ok {
+        http.Error(w, "Invalid token", http.StatusUnauthorized)
         return
     }
-    w.WriteHeader(http.StatusNoContent)
-}
 
-func DeleteCar(w http.ResponseWriter, r *http.Request) {
-    params := mux.Vars(r)
-    id, _ := strconv.Atoi(params["id"])
-    err := db.DeleteCarByID(id)
+    // Generate a new JWT token
+    newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+        "userID": userID,
+        "exp": time.Now().Add(time.Hour * 72).Unix(),
+    })
+
+    // Sign the token with the secret key
+    tokenString, err := newToken.SignedString([]byte("YourSecretKey"))
     if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
+        http.Error(w, "Error generating token", http.StatusInternalServerError)
         return
     }
-    w.WriteHeader(http.StatusNoContent)
+
+    // Return the new JWT token
+    w.Write([]byte(tokenString))
 }

@@ -4,8 +4,11 @@ import (
 	"database/sql"
 	"log"
 
+	"car_project/pkg/model"
+
+	"github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/database/postgres"
 	_ "github.com/lib/pq"
-    "car_project/pkg/model"
 )
 
 var DB *sql.DB
@@ -21,6 +24,32 @@ func InitDB() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// Run migrations
+	if err := runMigrations(DB); err != nil {
+		log.Fatalf("could not apply migrations: %v", err)
+	}
+
+}
+
+//Run migrations
+func runMigrations(db *sql.DB) error {
+	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		return err
+	}
+
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://path/to/migrations", // Replace with the path to your migration files
+		"postgres", driver)
+	if err != nil {
+		return err
+	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return err
+	}
+
+	return nil
 }
 
 // CreateUser inserts a new user into the database

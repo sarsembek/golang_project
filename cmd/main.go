@@ -9,6 +9,19 @@ import (
     "car_project/pkg/db"
 )
 
+// Middleware to set CORS headers
+func setCORSHeaders(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Access-Control-Allow-Origin", "*")
+        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        if r.Method == "OPTIONS" {
+            return
+        }
+        next.ServeHTTP(w, r)
+    })
+}
+
 func main() {
     // Initialize the database
     db.InitDB()
@@ -17,6 +30,9 @@ func main() {
     r := mux.NewRouter()
     api := r.PathPrefix("/api").Subrouter()
     api.Use(handlers.Authenticate)
+    
+    // Apply CORS middleware
+    r.Use(setCORSHeaders)
 
     // Define routes
     api.HandleFunc("/cars", handlers.CreateCar).Methods("POST")

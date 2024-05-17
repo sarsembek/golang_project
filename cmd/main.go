@@ -31,9 +31,14 @@ func main() {
     api.HandleFunc("/carhistory/{id}", handlers.UpdateCarHistory).Methods("PUT") 
     api.HandleFunc("/carhistory/{id}", handlers.DeleteCarHistory).Methods("DELETE") 
 
+    api.HandleFunc("/ratings", handlers.CreateRating).Methods("POST")
+    api.HandleFunc("/ratings", handlers.GetRating).Methods("GET")
+    api.HandleFunc("/ratings", handlers.UpdateRating).Methods("PUT")
+    api.HandleFunc("/ratings", handlers.DeleteRating).Methods("DELETE")
+
     r.HandleFunc("/user/register", handlers.RegisterUser).Methods("POST")
     r.HandleFunc("/user/login", handlers.LoginUser).Methods("POST")
-    r.HandleFunc("user/activate", handlers.Activate).Methods("POST")
+    r.HandleFunc("/user/activate", handlers.Activate).Methods("POST")
 
     // Start the server
     log.Fatal(http.ListenAndServe("0.0.0.0:8080", r))

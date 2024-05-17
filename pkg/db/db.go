@@ -17,7 +17,7 @@ var DB *sql.DB
 
 func InitDB() {
 	var err error
-	DB, err := sql.Open("postgres", "user=postgres password=postgres dbname=cars host=localhost port=5432 sslmode=disable")
+	DB, err = sql.Open("postgres", "postgres://cargo:sHavRWHcCKOlR4s08MmRTWDJ7r9GLryM@dpg-cp3mh2fsc6pc73fruuvg-a.frankfurt-postgres.render.com/cargo_o6tu")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -26,12 +26,13 @@ func InitDB() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	// Run migrations
 	if err := runMigrations(DB); err != nil {
 		log.Fatalf("could not apply migrations: %v", err)
 	}
-
 }
+
 
 //Run migrations
 func runMigrations(db *sql.DB) error {
@@ -85,9 +86,24 @@ func AuthenticateUser(username, password string) (bool, *model.User, error) {
 	return isAuthenticated, user, nil
 }
 
+func CarExists(carID int) (bool, error) {
+    // Prepare the SQL query
+    query := "SELECT COUNT(id) FROM car WHERE id = $1"
+
+    // Execute the query
+    var count int
+    err := DB.QueryRow(query, carID).Scan(&count)
+    if err != nil {
+        return false, err
+    }
+
+    // Return true if count is greater than 0, indicating the car exists
+    return count > 0, nil
+}
+
 // CreateCar inserts a new car into the database
 func CreateCar(c model.Car) error {
-	_, err := DB.Exec("INSERT INTO cars (brand, model, year, color, body_style, engine_size, weight, base_price, fuel_capacity, horsepower, torque, acceleration, top_speed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+	_, err := DB.Exec("INSERT INTO car (brand, model, year, color, body_style, engine_size, weight, base_price, fuel_capacity, horsepower, torque, acceleration, top_speed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
 		c.Brand,
 		c.Model,
 		c.Year,
@@ -110,7 +126,7 @@ func CreateCar(c model.Car) error {
 
 func GetAllCars() ([]model.Car, error) {
 	var cars []model.Car
-	rows, err := DB.Query("SELECT id, brand, model, year, color, body_style, engine_size, weight, base_price, fuel_capacity, horsepower, torque, acceleration, top_speed FROM cars")
+	rows, err := DB.Query("SELECT id, brand, model, year, color, body_style, engine_size, weight, base_price, fuel_capacity, horsepower, torque, acceleration, top_speed FROM car")
 	if err != nil {
 			return cars, err
 	}
@@ -148,7 +164,7 @@ func GetAllCars() ([]model.Car, error) {
 func GetCarWithPagination(page, limit int, sortBy, filterBy string) ([]model.Car, error) {
 	var cars []model.Car
 
-	query := "SELECT id, brand, model, year, color, body_style, engine_size, weight, base_price, fuel_capacity, horsepower, torque, acceleration, top_speed FROM cars"
+	query := "SELECT id, brand, model, year, color, body_style, engine_size, weight, base_price, fuel_capacity, horsepower, torque, acceleration, top_speed FROM car"
 
 	if filterBy != "" {
 		query += " WHERE brand LIKE '%" + filterBy + "%' OR model LIKE '%" + filterBy + "%'"
@@ -198,7 +214,7 @@ func GetCarWithPagination(page, limit int, sortBy, filterBy string) ([]model.Car
 // GetCarByID retrieves a car by ID from the database
 func GetCarByID(id int) (*model.Car, error) {
 	var car model.Car
-	err := DB.QueryRow("SELECT id, brand, model, year, color, body_style, engine_size, weight, base_price, fuel_capacity, horsepower, torque, acceleration, top_speed FROM cars WHERE id = $1", id).
+	err := DB.QueryRow("SELECT id, brand, model, year, color, body_style, engine_size, weight, base_price, fuel_capacity, horsepower, torque, acceleration, top_speed FROM car WHERE id = $1", id).
 		Scan(&car.ID, &car.Brand, &car.Model, &car.Year, &car.Color, &car.BodyStyle, &car.EngineSize, &car.Weight, &car.BasePrice, &car.FuelCapacity, &car.Horsepower, &car.Torque, &car.Acceleration, &car.TopSpeed)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -211,7 +227,7 @@ func GetCarByID(id int) (*model.Car, error) {
 
 // UpdateCarByID updates a car by ID in the database
 func UpdateCarByID(id int, c model.Car) error {
-	_, err := DB.Exec("UPDATE cars SET brand = $1, model = $2, year = $3, color = $4, body_style = $5, engine_size = $6, weight = $7, base_price = $8, fuel_capacity = $9, horsepower = $10, torque = $11, acceleration = $12, top_speed = $13 WHERE id = $14",
+	_, err := DB.Exec("UPDATE car SET brand = $1, model = $2, year = $3, color = $4, body_style = $5, engine_size = $6, weight = $7, base_price = $8, fuel_capacity = $9, horsepower = $10, torque = $11, acceleration = $12, top_speed = $13 WHERE id = $14",
 		c.Brand, c.Model, c.Year, c.Color, c.BodyStyle, c.EngineSize, c.Weight, c.BasePrice, c.FuelCapacity, c.Horsepower, c.Torque, c.Acceleration, c.TopSpeed, id)
 	if err != nil {
 		return err
@@ -221,7 +237,7 @@ func UpdateCarByID(id int, c model.Car) error {
 
 // DeleteCarByID deletes a car by ID from the database
 func DeleteCarByID(id int) error {
-	_, err := DB.Exec("DELETE FROM cars WHERE id = $1", id)
+	_, err := DB.Exec("DELETE FROM car WHERE id = $1", id)
 	if err != nil {
 		return err
 	}
@@ -303,5 +319,33 @@ func DeleteCarHistory(id int) error {
     if err != nil {
         return err
     }
+    return nil
+}
+
+// UpdateRating updates an existing rating in the database
+func UpdateRating(carID, userID int, updatedRating model.Rating) error {
+    // Prepare the SQL query
+    query := "UPDATE ratings SET stars = $1, comment = $2 WHERE car_id = $3 AND user_id = $4"
+    
+    // Execute the query
+    _, err := DB.Exec(query, updatedRating.Stars, updatedRating.Comment, carID, userID)
+    if err != nil {
+        return err
+    }
+    
+    return nil
+}
+
+// DeleteRating deletes a rating from the database based on car ID and user ID
+func DeleteRating(carID, userID int) error {
+    // Prepare the SQL query
+    query := "DELETE FROM ratings WHERE car_id = $1 AND user_id = $2"
+    
+    // Execute the query
+    _, err := DB.Exec(query, carID, userID)
+    if err != nil {
+        return err
+    }
+    
     return nil
 }

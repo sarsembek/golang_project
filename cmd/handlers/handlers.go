@@ -353,3 +353,139 @@ func DeleteCarHistory(w http.ResponseWriter, r *http.Request) {
 
 		w.WriteHeader(http.StatusOK)
 }
+
+func CreateRating(w http.ResponseWriter, r *http.Request) {
+    var rating model.Rating
+    err := json.NewDecoder(r.Body).Decode(&rating)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+
+    // Validate car_id
+    exists, err := db.CarExists(rating.CarID)
+    if err != nil {
+        http.Error(w, "Error checking car ID", http.StatusInternalServerError)
+        return
+    }
+    if !exists {
+        http.Error(w, "Car ID does not exist", http.StatusBadRequest)
+        return
+    }
+
+    // Validate user_id
+    if rating.UserID <= 0 {
+        http.Error(w, "Invalid user_id", http.StatusBadRequest)
+        return
+    }
+
+    // Insert the rating into the database
+    // (Assuming you have a ratings table)
+    insertQuery := "INSERT INTO ratings (car_id, stars, user_id, comment) VALUES ($1, $2, $3, $4)"
+    _, err = db.DB.Exec(insertQuery, rating.CarID, rating.Stars, rating.UserID, rating.Comment)
+    if err != nil {
+        http.Error(w, "Error inserting rating into database", http.StatusInternalServerError)
+        return
+    }
+
+    w.WriteHeader(http.StatusCreated)
+}
+
+
+// GetRating retrieves the rating for a specific car
+func GetRating(w http.ResponseWriter, r *http.Request) {
+    // Parse the car_id from the query parameters
+    carIDParam := r.URL.Query().Get("car_id")
+    carID, err := strconv.Atoi(carIDParam)
+    if err != nil {
+        http.Error(w, "Invalid car_id", http.StatusBadRequest)
+        return
+    }
+
+    // Validate car_id
+    exists, err := db.CarExists(carID)
+    if err != nil {
+        http.Error(w, "Error checking car ID", http.StatusInternalServerError)
+        return
+    }
+    if !exists {
+        http.Error(w, "Car ID does not exist", http.StatusBadRequest)
+        return
+    }
+
+    // Query the database for the rating
+    query := "SELECT car_id, stars, user_id, comment FROM ratings WHERE car_id = $1"
+    row := db.DB.QueryRow(query, carID)
+
+    var rating model.Rating
+    err = row.Scan(&rating.CarID, &rating.Stars, &rating.UserID, &rating.Comment)
+    if err != nil {
+        http.Error(w, "Rating not found", http.StatusNotFound)
+        return
+    }
+
+    // Return the rating as JSON
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(rating)
+}
+
+
+func UpdateRating(w http.ResponseWriter, r *http.Request) {
+    carID := r.URL.Query().Get("car_id")
+    userID := r.URL.Query().Get("user_id")
+
+    var updatedRating model.Rating
+    err := json.NewDecoder(r.Body).Decode(&updatedRating)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+
+    // Convert carID and userID to integers
+    carIDInt, err := strconv.Atoi(carID)
+    if err != nil {
+        http.Error(w, "Invalid car_id", http.StatusBadRequest)
+        return
+    }
+    userIDInt, err := strconv.Atoi(userID)
+    if err != nil {
+        http.Error(w, "Invalid user_id", http.StatusBadRequest)
+        return
+    }
+
+    // Update the rating in the database
+    err = db.UpdateRating(carIDInt, userIDInt, updatedRating)
+    if err != nil {
+        http.Error(w, "Error updating rating in database", http.StatusInternalServerError)
+        return
+    }
+
+    w.WriteHeader(http.StatusNoContent)
+}
+
+
+func DeleteRating(w http.ResponseWriter, r *http.Request) {
+    carID := r.URL.Query().Get("car_id")
+    userID := r.URL.Query().Get("user_id")
+
+    // Convert carID and userID to integers
+    carIDInt, err := strconv.Atoi(carID)
+    if err != nil {
+        http.Error(w, "Invalid car_id", http.StatusBadRequest)
+        return
+    }
+    userIDInt, err := strconv.Atoi(userID)
+    if err != nil {
+        http.Error(w, "Invalid user_id", http.StatusBadRequest)
+        return
+    }
+
+    // Delete the rating from the database
+    err = db.DeleteRating(carIDInt, userIDInt)
+    if err != nil {
+        http.Error(w, "Error deleting rating from database", http.StatusInternalServerError)
+        return
+    }
+
+    w.WriteHeader(http.StatusNoContent)
+}

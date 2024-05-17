@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/postgres"
+	_ "github.com/golang-migrate/migrate/source/file"
 	_ "github.com/lib/pq"
 )
 
@@ -15,7 +16,7 @@ var DB *sql.DB
 
 func InitDB() {
 	var err error
-	DB, err = sql.Open("postgres", "postgres://postgres:postgres@postgres/cars?sslmode=disable")
+	DB, err := sql.Open("postgres", "user=postgres password=postgres dbname=cars host=localhost port=5432 sslmode=disable")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,7 +40,7 @@ func runMigrations(db *sql.DB) error {
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
-		"file://path/to/migrations", // Replace with the path to your migration files
+		"file://migrations", // Replace with the path to your migration files
 		"postgres", driver)
 	if err != nil {
 		return err

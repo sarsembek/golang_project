@@ -302,7 +302,8 @@ func GetAllCarHistory(w http.ResponseWriter, r *http.Request) {
 
 // GetCarHistoryByID retrieves a car history record by ID
 func GetCarHistoryByID(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.Atoi(r.URL.Query().Get("id"))
+		params := mux.Vars(r)
+		id, err := strconv.Atoi(params["id"])
 		if err != nil {
 			http.Error(w, "Invalid car history ID", http.StatusBadRequest)
 			return

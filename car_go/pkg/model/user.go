@@ -9,7 +9,6 @@ type User struct {
 	ID       int    `json:"id"`       // Unique identifier for the user
 	Username string `json:"username"` // User's username, must be unique
 	Password string `json:"password"` // User's hashed password
-	// Additional fields like Email, Roles can be added here
 }
 
 // CreateUser hashes the password and creates a new user instance

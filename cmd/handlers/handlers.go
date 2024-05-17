@@ -392,11 +392,10 @@ func CreateRating(w http.ResponseWriter, r *http.Request) {
 }
 
 
-// GetRating retrieves the rating for a specific car
 func GetRating(w http.ResponseWriter, r *http.Request) {
-    // Parse the car_id from the query parameters
-    carIDParam := r.URL.Query().Get("car_id")
-    carID, err := strconv.Atoi(carIDParam)
+    // Parse the car_id from the URL path parameters
+    vars := mux.Vars(r)
+    carID, err := strconv.Atoi(vars["id"])
     if err != nil {
         http.Error(w, "Invalid car_id", http.StatusBadRequest)
         return
@@ -413,22 +412,36 @@ func GetRating(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Query the database for the rating
+    // Query the database for all ratings of the specified car
     query := "SELECT car_id, stars, user_id, comment FROM ratings WHERE car_id = $1"
-    row := db.DB.QueryRow(query, carID)
-
-    var rating model.Rating
-    err = row.Scan(&rating.CarID, &rating.Stars, &rating.UserID, &rating.Comment)
+    rows, err := db.DB.Query(query, carID)
     if err != nil {
-        http.Error(w, "Rating not found", http.StatusNotFound)
+        http.Error(w, "Error fetching ratings from database", http.StatusInternalServerError)
+        return
+    }
+    defer rows.Close()
+
+    // Slice to hold all ratings for the car
+    var ratings []model.Rating
+
+    // Iterate through the rows and populate the ratings slice
+    for rows.Next() {
+        var rating model.Rating
+        if err := rows.Scan(&rating.CarID, &rating.Stars, &rating.UserID, &rating.Comment); err != nil {
+            http.Error(w, "Error scanning ratings from database", http.StatusInternalServerError)
+            return
+        }
+        ratings = append(ratings, rating)
+    }
+    if err := rows.Err(); err != nil {
+        http.Error(w, "Error iterating through ratings", http.StatusInternalServerError)
         return
     }
 
-    // Return the rating as JSON
+    // Return the ratings as JSON
     w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(rating)
+    json.NewEncoder(w).Encode(ratings)
 }
-
 
 func UpdateRating(w http.ResponseWriter, r *http.Request) {
     carID := r.URL.Query().Get("car_id")

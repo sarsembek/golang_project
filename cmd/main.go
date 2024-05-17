@@ -32,7 +32,7 @@ func main() {
     api.HandleFunc("/carhistory/{id}", handlers.DeleteCarHistory).Methods("DELETE") 
 
     api.HandleFunc("/ratings", handlers.CreateRating).Methods("POST")
-    api.HandleFunc("/ratings", handlers.GetRating).Methods("GET")
+    api.HandleFunc("/cars/{id}/ratings", handlers.GetRating).Methods("GET")
     api.HandleFunc("/ratings", handlers.UpdateRating).Methods("PUT")
     api.HandleFunc("/ratings", handlers.DeleteRating).Methods("DELETE")
 
